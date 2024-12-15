@@ -1,0 +1,234 @@
+##My working directory
+setwd("D:/Research/Dengue projection study")
+
+#Load the necessary libraries
+library(readxl)#for excel data read
+library(tidyverse)#for data processing
+library(tseries)#for time series format
+library(zoo)#for time series process
+library(forecast)#for time series modeling and forecasting
+library(ggplot2)#for visualization
+library(scales)#for scaling
+library(gridExtra)#combining plot
+library(forecastxgb)#for xgboost modeling
+
+
+#Upload the data
+data<-read_excel("df_DENV__ARMAN.xlsx",sheet="Data")
+head(data)
+
+##Descriptive statistics
+# Aggregate cases by year
+yearly_totals <- data %>%
+  group_by(Year) %>%
+  summarize(Total_Cases = sum(Cases))
+
+View(yearly_totals)
+
+# Average cases by year,min, max and SD for each year.
+yearly_stats <- data %>%
+  group_by(Year) %>%
+  summarize(
+    Avg_Cases = mean(Cases, na.rm = TRUE),  # Yearly average cases
+    Min_Cases = min(Cases, na.rm = TRUE),   # Minimum cases for each year
+    Max_Cases = max(Cases, na.rm = TRUE),   # Maximum cases for each year
+    SD_Cases = sd(Cases, na.rm = TRUE)      # Standard deviation of cases for each year
+  )
+
+View(yearly_stats)
+
+# Plot with points for outliers
+ggplot(data, aes(x = factor(Months), y = Cases)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.size = 2) +  # Red points for outliers
+  labs(title = "Seasonality of Dengue Cases (2000-2023)", x = "Months", y = "Dengue Cases") +
+  theme_minimal()
+
+
+##Time series formatting and plotting
+dengue_ts<-ts(data$Cases, start = c(2000, 1), frequency = 12)#Time series formatting
+#Time series plot
+plot(dengue_ts, main = "Monthly Dengue Cases (2000-2023)", ylab = "Cases", xlab = "Year")
+
+##Time series plotting highlighting 2019 and 2023 epidemic year
+ggplot(data, aes(x = date, y = Cases)) + 
+  geom_line(color = "steelblue", size = 1.2) +          # Main line color and size
+  geom_point(data = subset(data, Year == 2019 | Year == 2023), 
+             aes(color = factor(Year)), size = 3) +     # Highlight 2019 and 2023
+  scale_color_manual(values = c("2019" = "red", "2023" = "purple"),
+                     labels = c("2019 Peak", "2023 Peak")) +  # Custom color and labels
+  theme_minimal(base_size = 15) +                       # Minimal theme with larger font size
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "black", size = 12),  # Rotated X-axis labels
+    axis.text.y = element_text(color = "black", size = 12),                         # Y-axis labels
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 18),               # Bold, centered title
+    panel.grid.minor = element_blank(),                                             # Remove minor grid lines
+    panel.grid.major.x = element_line(size = 0.2, color = "gray80"),                # Light major grid lines
+    legend.position = c(0.8, 0.85),                                                 # Legend inside plot
+    legend.title = element_blank(),                                                 # No legend title
+    legend.background = element_rect(fill = "white", color = "black", size = 0.5),  # Border around legend
+    panel.grid.major = element_line(size = 0.1, color = "gray80")                   # Light grid lines
+  ) +
+  labs(title = "",
+       x = "Date",
+       y = "Number of Cases") +
+  scale_x_yearmon(breaks = seq(min(data$date), max(data$date), by = 1)) +  # Set X-axis breaks yearly
+  guides(color = guide_legend(override.aes = list(size = 4)))              # Larger points in legend
+
+# Boxplot for monthly visualization of dengue data
+# Convert month numbers to month abbreviations
+data$MonthName <- factor(month.abb[data$Months], levels = month.abb)
+
+# Plot with log scale and month names on the x-axis
+ggplot(data, aes(x = MonthName, y = Cases)) +
+  geom_boxplot(fill = "lightblue") +
+  scale_y_log10(labels = comma) +  # Use comma format to avoid scientific notation
+  labs(title = "", 
+       x = "Months", y = "Log(Dengue Cases)") +
+  theme_minimal()
+
+#log transformation
+data$Cases_log <- log1p(data$Cases)  # log1p to handle zeros
+dengue_log_ts<-ts(data$Cases_log,start=c(2000,1),frequency=12)
+
+#Data split
+## 90% of the sample size
+smp_size<-floor(0.9 * nrow(data))
+print(smp_size)
+## set the seed to make partition reproducible
+set.seed(123)
+train_ind <-sample(seq_len(nrow(data)),size = smp_size)
+train<-data[1:smp_size,]
+test <-data[smp_size+1:nrow(data),]
+test<-na.omit(test)
+
+##ts format of the train and test
+train<-ts(train$Cases_log,start=c(2000,1),frequency=12)
+test<-ts(test$Cases_log,start=c(2021,8),frequency=12)
+
+# Decompose log-transformed time series
+train_decomp <- decompose(train)
+
+# Convert the decomposed components to a data frame
+decomp_df <- data.frame(
+  Time = time(train), 
+  Observed = train,
+  Trend = train_decomp$trend,
+  Seasonal = train_decomp$seasonal,
+  Residual = train_decomp$random
+) %>% 
+  pivot_longer(cols = c(Observed, Trend, Seasonal, Residual), 
+               names_to = "Component", values_to = "Value")
+
+# Plot using ggplot2
+ggplot(decomp_df, aes(x = Time, y = Value, color = Component)) +
+  geom_line(size=0.8, show.legend = F) +
+  facet_wrap(~ Component, ncol = 1, scales = "free_y") +
+  theme_minimal() +
+  labs(title = "", 
+       x = "Time", 
+       y = "Value")
+
+# ADF Test for Log-transformed Data
+adf_test_train <- adf.test(train, alternative = "stationary")
+print(adf_test_train)
+
+
+##seasonal differencing
+diff_seasonal_ts <- diff(train, lag = 12)  # Seasonal differencing
+plot(diff_seasonal_ts)
+
+
+# ADF Test for Seasonal Differenced Data
+adf_test_seasonal_diff <- adf.test(diff_seasonal_ts, alternative = "stationary")
+print(adf_test_seasonal_diff)
+
+
+# ACF and PACF plots
+p1<-ggAcf(train)+ggtitle("");p1
+p2<-ggPacf(train)+ggtitle("");p2
+grid.arrange(p1,p2)
+
+
+##Modeling
+# Fit ARIMA model using auto.arima
+Model <- auto.arima(train, seasonal = TRUE,max.P=0, stepwise = TRUE, approximation = FALSE,trace=TRUE)
+
+# Print model summary
+summary(Model)
+
+# Check residuals
+checkresiduals(Model)
+
+# Forecast and plot
+fc1 <- forecast(Model, h = 29)  # Forecasting the next 29 periods
+accuracy(fc1,test)
+
+f1<-autoplot(dengue_log_ts,series="Actual")+autolayer(fc1, series="Forecast",PI=F)+autolayer(fitted(fc1), series="Fitted")+
+  ylab("Log_dengue_cases")+xlab("")+ggtitle("A: ARIMA(1,0,0)(0,1,2)[12]")+theme_bw()+theme_set(theme_bw()+theme(legend.position ="none"))
+f1
+
+
+# Convert forecasted values from log scale to original scale
+fc1$mean <- exp(fc1$mean) - 1
+
+##XGBoost model
+md2<-xgbar(train,
+           nrounds=23,
+           nrounds_method = "cv",
+           seas_method = "dummies",
+           trend_method = "differencing",
+           nfold=10)
+
+##Feature importance
+
+#xgb forecast
+fc2<-forecast(md2,h=29,level=o.95);fc2
+accuracy(fc2,test)
+
+
+#Forecasting plot
+f2<-autoplot(dengue_log_ts,series="Actual")+autolayer(fc2, series="Forecast")+autolayer(fitted(fc2), series="Fitted")+
+  ylab("Log_dengue_cases")+xlab("Year")+ggtitle("XGBoost forecasting")+theme_bw()+theme_set(theme_bw()+theme(legend.position ="none"))
+f2
+
+grid.arrange(f1,f2)
+
+
+##Five years forecasting using XGBoost
+md3<-xgbar(dengue_log_ts,
+           nrounds=23,
+           nrounds_method = "cv",
+           seas_method = "dummies",
+           trend_method = "differencing",
+           nfold=10)
+
+#xgb forecast
+fc3<-forecast(md2,h=60,level=o.95);fc3
+# Convert forecasted values from log scale to original scale
+fc3$mean <- exp(fc3$mean) - 1
+
+#Projection plot
+f3 <- autoplot(dengue_ts, series = "Actual",size=1) +
+  autolayer(fc3$mean, series = "Forecast",size=1) +
+  ylab("Dengue Cases") +
+  xlab("Year") +
+  ggtitle("Dengue Case Forecasting") +
+  theme_bw() +
+  theme(
+    legend.position = "top",  # Place legend at the top
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),  # Title styling
+    axis.title.x = element_text(size = 12),  # X-axis title styling
+    axis.title.y = element_text(size = 12),  # Y-axis title styling
+    axis.text = element_text(size = 10),  # Axis text styling
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Tilt X-axis labels
+    panel.grid.major = element_line(color = "gray", size = 0.5),  # Add grid lines
+    panel.grid.minor = element_line(color = "lightgray", size = 0.25)  # Minor grid lines
+  ) +
+  scale_x_continuous(
+    breaks = seq(from = min(time(dengue_ts)), to = 2029, by = 3),  # Interval of 3 years on X-axis
+    limits = c(min(time(dengue_ts)), 2029)  # Limit X-axis to max 2028
+  ) +
+  scale_color_manual(values = c("Actual" = "steelblue", "Forecast" = "red"))  # Customize color
+
+# Display the plot
+f3
