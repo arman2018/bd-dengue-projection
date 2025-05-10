@@ -203,9 +203,13 @@ md3<-xgbar(dengue_log_ts,
            nfold=10)
 
 #xgb forecast
-fc3<-forecast(md2,h=60,level=o.95);fc3
+fc3<-forecast(md3,h=60,level=o.95);fc3
 # Convert forecasted values from log scale to original scale
 fc3$mean <- exp(fc3$mean) - 1
+
+##Calculating Upper and lower limit using RMSE value
+lower<-fc3$mean-1.96*0.63
+upper<-fc3$mean+1.96*0.63
 
 #Projection plot
 f3 <- autoplot(dengue_ts, series = "Actual",size=1) +
