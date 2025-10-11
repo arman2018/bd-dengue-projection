@@ -208,32 +208,50 @@ fc3<-forecast(md3,h=60,level=o.95);fc3
 fc3$mean <- exp(fc3$mean) - 1
 
 ##Calculating Upper and lower limit using RMSE value
+##test RMSE
+RMSE<-0.63
+
 lower<-fc3$mean-1.96*RMSE
 upper<-fc3$mean+1.96*RMSE
 
+##Prediction interval
+lower_ci<-exp(lower) - 1
+upper_ci<-exp(upper)-1
+
+
 #Projection plot
-f3 <- autoplot(dengue_ts, series = "Actual",size=1) +
-  autolayer(fc3$mean, series = "Forecast",size=1) +
-  ylab("Dengue Cases") +
-  xlab("Year") +
-  ggtitle("Dengue Case Forecasting") +
-  theme_bw() +
+#predicted data
+df <- read_excel("predicted_data.xlsx")
+
+#Create a date variable ---
+df <- df %>%
+  mutate(
+    Month_num = match(Months, month.abb),  # Convert month abbreviations to numbers
+    Date = as.Date(paste(Year, Month_num, "01", sep = "-"))
+  )
+
+#Plot ---
+ggplot(df, aes(x = Date)) +
+  # 95% confidence interval (shaded region)
+  geom_ribbon(aes(ymin = `Lower 95%`, ymax = `Upper 95%`),
+              fill = "firebrick", alpha = 0.15) +
+  
+  # Prediction line
+  geom_line(aes(y = Prediction), color = "firebrick", linewidth = 1.1) +
+  
+  # Points on the line
+  geom_point(aes(y = Prediction), color = "firebrick", size = 2) +
+  
+  # Labels and theme
+  labs(
+    title = "",
+    x = "Year",
+    y = "Predicted Cases"
+  ) +
+  theme_minimal(base_size = 14) +
   theme(
-    legend.position = "top",  # Place legend at the top
-    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),  # Title styling
-    axis.title.x = element_text(size = 12),  # X-axis title styling
-    axis.title.y = element_text(size = 12),  # Y-axis title styling
-    axis.text = element_text(size = 10),  # Axis text styling
-    axis.text.x = element_text(angle = 45, hjust = 1),  # Tilt X-axis labels
-    panel.grid.major = element_line(color = "gray", size = 0.5),  # Add grid lines
-    panel.grid.minor = element_line(color = "lightgray", size = 0.25)  # Minor grid lines
+    plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+    panel.grid.minor = element_blank()
   ) +
-  scale_x_continuous(
-    breaks = seq(from = min(time(dengue_ts)), to = 2029, by = 3),  # Interval of 3 years on X-axis
-    limits = c(min(time(dengue_ts)), 2029)  # Limit X-axis to max 2028
-  ) +
-  scale_color_manual(values = c("Actual" = "steelblue", "Forecast" = "red"))  # Customize color
-
-# Display the plot
-f3
-
+  scale_x_date(date_breaks = "6 months", date_labels = "%b-%Y") +
+  scale_y_continuous(labels = scales::comma)
