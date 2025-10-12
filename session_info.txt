@@ -1,0 +1,30 @@
+R version 4.4.0 (2024-04-24 ucrt)
+Platform: x86_64-w64-mingw32/x64
+Running under: Windows 11 x64 (build 26200)
+
+Matrix products: default
+
+
+locale:
+[1] LC_COLLATE=English_United States.utf8  LC_CTYPE=English_United States.utf8   
+[3] LC_MONETARY=English_United States.utf8 LC_NUMERIC=C                          
+[5] LC_TIME=English_United States.utf8    
+
+time zone: Asia/Dhaka
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+loaded via a namespace (and not attached):
+ [1] Matrix_1.7-0      jsonlite_1.8.8    gtable_0.3.5      dplyr_1.1.4       compiler_4.4.0   
+ [6] tidyselect_1.2.1  Rcpp_1.0.12       parallel_4.4.0    scales_1.3.0      lattice_0.22-6   
+[11] ggplot2_3.5.1     R6_2.5.1          generics_0.1.3    curl_5.2.1        lmtest_0.9-40    
+[16] tibble_3.2.1      munsell_0.5.1     nnet_7.3-19       forecast_8.22.0   timeDate_4032.109
+[21] pillar_1.9.0      rlang_1.1.3       quantmod_0.4.26   utf8_1.2.4        urca_1.3-3       
+[26] quadprog_1.5-8    cli_3.6.2         magrittr_2.0.3    xts_0.13.2        grid_4.4.0       
+[31] rstudioapi_0.16.0 neuralnet_1.44.2  xgboost_1.7.7.1   lifecycle_1.0.4   nlme_3.1-164     
+[36] fracdiff_1.5-3    vctrs_0.6.5       data.table_1.15.4 glue_1.7.0        tseries_0.10-56  
+[41] zoo_1.8-12        fansi_1.0.6       colorspace_2.1-0  TTR_0.24.4        tools_4.4.0      
+[46] pkgconfig_2.0.3  
+> 
