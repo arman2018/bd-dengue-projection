@@ -180,6 +180,13 @@ md2<-xgbar(train,
            nfold=10)
 
 ##Feature importance
+summary(md2)
+#plot
+xgb.feature<-read_excel("xgb.features.xlsx");xgb.feature
+ggplot(xgb.feature,aes(x=Gain,y=reorder(Features,Gain),fill=Features))+
+  geom_bar(stat="identity",position = "dodge")+theme(text = element_text(size=18))+
+  theme_set(theme_bw()+theme(legend.position ="none"))+
+  ggtitle("")+xlab("Importance")+ylab("Features")
 
 #xgb forecast
 fc2<-forecast(md2,h=29,level=o.95);fc2
@@ -255,3 +262,4 @@ ggplot(df, aes(x = Date)) +
   ) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b-%Y") +
   scale_y_continuous(labels = scales::comma)
+
